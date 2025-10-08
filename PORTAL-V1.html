@@ -1,0 +1,1397 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>📊 SOC – Nhập liệu & Biểu đồ (v3.14)</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+  <style>
+    :root{
+      --ink:#111827;--muted:#6b7280;--line:#e5e7eb;--bg:#f3f4f6;--pri:#6366f1;--accent:#0ea5e9;
+      --bad:#ef4444;--warn:#f59e0b;--good:#10b981;--blue:#3b82f6;--card:#ffffff
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+    .wrap{max-width:1200px;margin:0 auto;padding:16px}
+    .header{background:linear-gradient(135deg,#4f46e5,var(--accent));color:#fff;border-radius:16px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .tabbar{display:flex;gap:10px}
+    .tab{min-width:160px;padding:10px 16px;text-align:center;background:#fff;border:1px solid var(--line);cursor:pointer;font-weight:700;border-radius:12px;box-shadow:0 2px 6px rgba(0,0,0,.05)}
+    .tab.active{outline:3px solid rgba(255,255,255,.2)}
+    .panel{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:10px;box-shadow:0 6px 18px rgba(0,0,0,.06)}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px}
+    input,select,textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:10px;font:inherit}
+    textarea{min-height:38px}
+    .btn{border:0;border-radius:10px;padding:8px 12px;font-weight:700;cursor:pointer}
+    .btn.primary{background:var(--pri);color:#fff}
+    .btn.ghost{background:#fff;border:1px solid var(--line)}
+    .btn.danger{background:var(--bad);color:#fff}
+    fieldset{border:1px solid var(--line);border-radius:10px;margin:0 0 12px;padding:10px}
+    legend{padding:0 6px;font-weight:700;color:var(--muted)}
+    .chart-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;justify-items:stretch;align-items:stretch}
+    .chart-box{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff}
+    .chart-title{text-align:center;font-weight:700;margin:4px 0 8px}
+    .canvas-wrap{position:relative;height:320px}
+    .full{grid-column:1/-1}
+    .hidden{display:none}
+    .note{font-size:12px;color:var(--muted)}
+    .tag{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 10px;font-size:12px}
+    .muted{color:var(--muted)}
+
+    .section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+    .actions{display:flex;gap:8px;flex-wrap:wrap}
+
+    .section-title{display:flex;align-items:center;gap:8px;font-weight:800;font-size:18px;color:#0f172a;margin:18px 2px 10px}
+    .table-grid{display:grid;grid-template-columns:1fr;gap:14px}
+    @media(min-width:960px){ .table-grid{grid-template-columns:1fr 1fr} }
+    .table-box{border:1px solid var(--line);border-radius:12px;background:#fff}
+    .table-box .box-head{padding:10px 12px;border-bottom:1px solid var(--line);font-weight:700}
+    .table-box .box-body{padding:8px;overflow:auto}
+    .tbl{width:100%;border-collapse:separate;border-spacing:0}
+    .tbl thead th{background:#1f2937;color:#fff;text-align:left;padding:10px;font-weight:700;border-top-left-radius:8px;border-top-right-radius:8px}
+    .tbl thead th+th{border-top-left-radius:0;border-top-right-radius:0}
+    .tbl td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top}
+    .tbl tr:last-child td{border-bottom:0}
+    .td-center{text-align:center}
+
+    .count-badge{display:inline-flex;min-width:2.2em;height:1.8em;align-items:center;justify-content:center;border-radius:8px;padding:0 8px;font-weight:700}
+    .count-badge.bad{color:#991b1b;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.35)}
+    .count-badge.warn{color:#7c2d12;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.35)}
+    .count-badge.good{color:#065f46;background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.35)}
+
+    .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    @media(max-width:720px){ .stat-grid{grid-template-columns:1fr} }
+    .stat-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+    .stat-card .num{font-size:28px;font-weight:900}
+    .stat-card .lbl{font-size:12px;color:var(--muted)}
+    .alert-box{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0;background:#fff}
+    .alert-box.red{border-color:rgba(239,68,68,.35);background:rgba(239,68,68,.08)}
+    .bullet{margin:0 0 0 18px;padding:0}
+    .bullet li{margin:4px 0}
+    .status-pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 8px;font-size:12px;font-weight:700}
+    .status-ok{color:#065f46;background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.35)}
+    .status-warn{color:#7c2d12;background:rgba(245,158,11,.18);border:1px solid rgba(245,158,11,.45)}
+    .status-bad{color:#991b1b;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.35)}
+
+    .export-header{display:none;border-left:4px solid var(--accent);padding:10px 12px;margin-bottom:10px;background:#fff;border-radius:8px;align-items:flex-start;justify-content:space-between;gap:10px}
+    .exporting .export-header{display:flex}
+    .exporting .hide-when-export{display:none !important}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <div>
+        <div style="font-weight:800">📊 SOC – Nhập liệu & Biểu đồ (v3.14)</div>
+        <div class="note">localStorage key <code>soc_weeks</code></div>
+      </div>
+      <div class="tabbar">
+        <button class="tab active" data-tab="page-input">📝 Nhập dữ liệu</button>
+        <button class="tab" data-tab="page-charts">📈 Xem biểu đồ</button>
+        <button class="tab" data-tab="page-servers">🖥️ Tình trạng Server/Firewall</button>
+      </div>
+    </div>
+
+    <!-- PAGE 1: INPUT -->
+    <section id="page-input" class="panel">
+      <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div class="note">Nhập tay → Lưu tuần vào localStorage (và đồng bộ server nếu đã đăng nhập)</div>
+        <div class="row">
+          <button class="btn ghost" id="btnExportAll" type="button">⬇️ Export toàn bộ</button>
+          <button class="btn ghost" id="btnImportFile" type="button">⬆️ Import file JSON</button>
+          <input id="fileJSON" type="file" class="hidden" accept="application/json">
+          <button class="btn primary" id="btnImportXLSX" type="button">📥 Import Excel (.xlsx)</button>
+          <input id="fileXLSX" type="file" class="hidden" multiple accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+          <label class="row" style="gap:6px;margin-left:8px;">
+            <input type="checkbox" id="autoSaveOnImport"> Tự động lưu khi import
+          </label>
+        </div>
+      </div>
+
+      <form onsubmit="return false" id="form">
+        <fieldset>
+          <legend>Thông tin tuần</legend>
+          <div class="grid">
+            <div><label>Tuần số (tùy chọn)</label><input id="week_no" type="number" min="1"></div>
+            <div><label>Từ ngày</label><input id="w_start" type="date"></div>
+            <div><label>Đến ngày</label><input id="w_end" type="date"></div>
+            <div><label>Khách hàng</label><input id="customer" placeholder="VD: Fujikin Việt Nam"></div>
+            <div><label>Người lập</label><input id="prepared_by" placeholder="VD: SOC Team"></div>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Daily – Zabbix</legend>
+          <div id="zbxDays" class="grid"></div>
+          <div class="row">
+            <button class="btn ghost" id="addZbxDay" type="button">➕ Thêm ngày</button>
+            <button class="btn ghost" id="btnSeed7Zbx" type="button">⚡ 7 ngày gần nhất</button>
+            <button class="btn danger" id="clrZbxDays" type="button">🗑️ Xóa hết</button>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Daily – Sophos</legend>
+          <div id="sophDays" class="grid"></div>
+          <div class="row">
+            <button class="btn ghost" id="addSophDay" type="button">➕ Thêm ngày</button>
+            <button class="btn ghost" id="btnSeed7Soph" type="button">⚡ 7 ngày gần nhất</button>
+            <button class="btn danger" id="clrSophDays" type="button">🗑️ Xóa hết</button>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Top events – Zabbix</legend>
+          <div id="zbxEvents" class="grid"></div>
+          <div class="row"><button class="btn ghost" id="addZbxEvent" type="button">➕ Thêm event</button><button class="btn danger" id="clrZbxEvents" type="button">🗑️ Xóa hết</button></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Top events – Sophos</legend>
+          <div id="sophEvents" class="grid"></div>
+          <div class="row"><button class="btn ghost" id="addSophEvent" type="button">➕ Thêm event</button><button class="btn danger" id="clrSophEvents" type="button">🗑️ Xóa hết</button></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Sophos – Top người dùng phát hiện</legend>
+          <div id="sophUsers" class="grid"></div>
+          <div class="row"><button class="btn ghost" id="addSophUser" type="button">➕ Thêm người dùng</button><button class="btn danger" id="clrSophUsers" type="button">🗑️ Xóa hết</button></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Wazuh – Domain & Sessions</legend>
+          <div id="wazuhEvents" class="grid"></div>
+          <div class="row"><button class="btn ghost" id="addWazuhEvent" type="button">➕ Thêm dòng</button><button class="btn danger" id="clrWazuhEvents" type="button">🗑️ Xóa hết</button></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Zabbix – Top thiết bị Login Failed</legend>
+          <div id="zbxLogin" class="grid"></div>
+          <div class="row"><button class="btn ghost" id="addZbxLogin" type="button">➕ Thêm thiết bị</button><button class="btn danger" id="clrZbxLogin" type="button">🗑️ Xóa hết</button></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Sophos – Top thiết bị truy cập Web Malware</legend>
+          <div id="sophWebMal" class="grid"></div>
+          <div class="row"><button class="btn ghost" id="addSophWebMal" type="button">➕ Thêm thiết bị</button><button class="btn danger" id="clrSophWebMal" type="button">🗑️ Xóa hết</button></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Tổng quan hệ thống (Uptime)</legend>
+          <div class="grid">
+            <div><label>Thời gian giám sát mỗi server (giờ)</label><input id="ov_time_per_srv" type="number" min="0" step="0.1" value="168"></div>
+            <div><label>Số server không hoạt động</label><input id="ov_srv_down" type="number" min="0" value="0"></div>
+            <div><label>Downtime mỗi server không hoạt động (giờ)</label><input id="ov_down_per_srv" type="number" min="0" step="0.1" value="0"></div>
+          </div>
+          <div class="note">Uptime (%) = (Tổng thời gian × server − Downtime × server không hoạt động) / (Tổng thời gian × server). Thời gian tính theo giờ.</div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Hiệu năng CPU server (nhập liệu)</legend>
+          <div id="srvCPU" class="grid"></div>
+          <div class="row">
+            <button class="btn ghost" id="addSrvCPU" type="button">➕ Thêm server (CPU)</button>
+            <button class="btn danger" id="clrSrvCPU" type="button">🗑️ Xóa hết</button>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Hiệu năng RAM server (nhập liệu)</legend>
+          <div id="srvRAM" class="grid"></div>
+          <div class="row">
+            <button class="btn ghost" id="addSrvRAM" type="button">➕ Thêm server (RAM)</button>
+            <button class="btn danger" id="clrSrvRAM" type="button">🗑️ Xóa hết</button>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Tình trạng ổ đĩa server (nhập liệu)</legend>
+          <div id="srvDisk" class="grid"></div>
+          <div class="row">
+            <button class="btn ghost" id="addSrvDisk" type="button">➕ Thêm server (Disk)</button>
+            <button class="btn danger" id="clrSrvDisk" type="button">🗑️ Xóa hết</button>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Tình trạng Firewall (nhập liệu)</legend>
+          <div>
+            <label>Vấn đề cần xử lý (gạch đầu dòng)</label>
+            <div id="fwIssues" class="grid"></div>
+            <div class="row"><button class="btn ghost" id="addFwIssue" type="button">➕ Thêm dòng</button><button class="btn danger" id="clrFwIssue" type="button">🗑️ Xóa hết</button></div>
+          </div>
+          <div style="margin-top:8px">
+            <label>Danh sách thiết bị Firewall</label>
+            <div id="fwInfo" class="grid"></div>
+            <div class="row"><button class="btn ghost" id="addFwInfo" type="button">➕ Thêm thiết bị</button><button class="btn danger" id="clrFwInfo" type="button">🗑️ Xóa hết</button></div>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Servers (legacy – tùy chọn)</legend>
+          <div id="serverList" class="grid"></div>
+          <div class="row"><button class="btn ghost" id="addServer" type="button">➕ Thêm server (legacy)</button><button class="btn danger" id="clrServers" type="button">🗑️ Xóa hết</button></div>
+        </fieldset>
+
+        <div class="row">
+          <button class="btn primary" id="btnSaveWeek" type="button">💾 Lưu tuần</button>
+          <button class="btn ghost" id="btnGoCharts" type="button">📈 Xem biểu đồ</button>
+          <div class="tag" id="stateMsg">Trạng thái: Đang trống</div>
+        </div>
+      </form>
+
+      <!-- Templates -->
+      <template id="tplDay"><div class="card day"><div class="grid"><div><label>Ngày</label><input type="date" class="d_date"></div><div><label>Số cảnh báo</label><input type="number" class="d_count" min="0" value="0"></div></div><div class="row"><button class="btn ghost btn-del" type="button">🗑️ Xóa</button></div></div></template>
+
+      <template id="tplEvent"><div class="card evt"><div class="grid"><div><label>Tên event</label><input class="e_name"></div><div><label>Số lượng</label><input type="number" class="e_count" min="0" value="0"></div><div style="grid-column:1/-1"><label>Thông tin (tùy chọn)</label><textarea class="e_info" placeholder="Ghi chú/Địa chỉ IP/Ngữ cảnh..."></textarea></div></div><div class="row"><button class="btn ghost btn-del" type="button">🗑️ Xóa</button></div></div></template>
+
+      <template id="tplSophUser"><div class="card su"><div class="grid"><div><label>User</label><input class="u_user"></div><div><label>Entity</label><input class="u_entity"></div><div><label>Detections</label><input type="number" class="u_count" min="0" value="0"></div></div><div class="row"><button class="btn ghost btn-del" type="button">🗑️ Xóa</button></div></div></template>
+
+      <template id="tplWazuh"><div class="card wz"><div class="grid"><div><label>Domain/Event</label><input class="w_name" placeholder="login.live.com"></div><div><label>Sessions</label><input type="number" class="w_count" min="0" value="0"></div></div><div class="row"><button class="btn ghost btn-del" type="button">🗑️ Xóa</button></div></div></template>
+
+      <template id="tplZbxLogin"><div class="card zl"><div class="grid"><div><label>Thiết bị/Server/PC</label><input class="zl_name" placeholder="(BN)-FBRADIUS"></div><div><label>Số lần Login Failed</label><input type="number" class="zl_count" min="0" value="0"></div></div><div class="row"><button class="btn ghost btn-del" type="button">🗑️ Xóa</button></div></div></template>
+
+      <template id="tplSophWebMal"><div class="card swm"><div class="grid"><div><label>Thiết bị</label><input class="swm_name" placeholder="BN2312-05QUY"></div><div><label>Detections</label><input type="number" class="swm_count" min="0" value="0"></div></div><div class="row"><button class="btn ghost btn-del" type="button">🗑️ Xóa</button></div></div></template>
+
+      <template id="tplBullet"><div class="card bl"><div class="grid"><div style="grid-column:1/-1"><input class="bl_text" placeholder="Fortinet TL: Tài nguyên cao"></div></div><div class="row"><button class="btn ghost btn-del" type="button">🗑️ Xóa</button></div></div></template>
+
+      <template id="tplFwInfo"><div class="card fwi"><div class="grid"><div><label>Thiết bị Firewall</label><input class="fwi_name" placeholder="Fortinet TL"></div><div><label>CPU Max (%)</label><input type="number" class="fwi_cpu" min="0" max="100" value="0"></div><div><label>Memory Max (%)</label><input type="number" class="fwi_mem" min="0" max="100" value="0"></div><div><label>Trạng thái</label><select class="fwi_status"><option value="BÌNH THƯỜNG">BÌNH THƯỜNG</option><option value="CẢNH BÁO">CẢNH BÁO</option><option value="LỖI">LỖI</option></select></div><div style="grid-column:1/-1"><label>Ghi chú</label><input class="fwi_note" placeholder="Ổn định / Mất dữ liệu ..."></div></div><div class="row"><button class="btn ghost btn-del" type="button">🗑️ Xóa</button></div></div></template>
+    </section>
+
+    <!-- PAGE 2: CHARTS -->
+    <section id="page-charts" class="panel hidden">
+      <div id="exportHeaderCharts" class="export-header">
+        <div class="left">
+          <div class="ttl">🛡️ SOC Dashboard – Netmarks VN</div>
+          <div class="sub">Giám sát An ninh Mạng của phòng SOC trực thuộc công ty Netmarks Việt Nam</div>
+          <div class="sub" id="exportChartsMeta"></div>
+        </div>
+        <div class="right"><span class="badge-report badge-sys">BÁO CÁO HỆ THỐNG</span></div>
+      </div>
+
+      <div class="section-head hide-when-export">
+        <div class="note">Chọn tuần để hiển thị</div>
+        <div class="actions">
+          <select id="weekPicker"></select>
+          <button class="btn ghost" id="btnEditWeek" type="button">✏️ Sửa tuần này</button>
+          <button class="btn ghost" id="btnDuplicateWeek" type="button">📄 Nhân bản tuần</button>
+          <button class="btn danger" id="btnDeleteWeek" type="button">🗑️ Xóa tuần</button>
+          <button class="btn primary" id="btnExportChartsPDF" type="button">🖨️ Xuất PDF trang này</button>
+        </div>
+      </div>
+
+      <div class="chart-grid">
+        <div class="chart-box"><div class="chart-title">Cảnh báo Zabbix theo ngày</div><div class="canvas-wrap"><canvas id="c_zbx"></canvas></div></div>
+        <div class="chart-box"><div class="chart-title">Cảnh báo Sophos theo ngày</div><div class="canvas-wrap"><canvas id="c_soph"></canvas></div></div>
+        <div class="chart-box full"><div class="chart-title">Top cảnh báo trong tuần (Zabbix + Sophos)</div><div class="canvas-wrap" style="height:340px"><canvas id="c_top"></canvas></div></div>
+      </div>
+
+      <div class="section-title">📘 PHÂN TÍCH HỆ THỐNG ZABBIX</div>
+      <div class="table-box">
+        <div class="box-head">Bảng cảnh báo Zabbix</div>
+        <div class="box-body">
+          <table class="tbl">
+            <thead><tr><th>Cảnh báo</th><th style="width:120px">Số lượng</th><th>Thông tin</th></tr></thead>
+            <tbody id="tbl_zbx_events"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="chart-box full" style="margin-top:12px">
+        <div class="chart-title">🔔 Top 10 Event Zabbix</div>
+        <div class="canvas-wrap" style="height:360px"><canvas id="c_zbx_top10"></canvas></div>
+      </div>
+      <div class="chart-box full" style="margin-top:12px">
+        <div class="chart-title">🚫 Danh sách thiết bị ghi nhận nhiều lần đăng nhập không thành công.</div>
+        <div class="canvas-wrap" style="height:320px"><canvas id="c_zbx_login"></canvas></div>
+      </div>
+
+      <div class="section-title">🔐 PHÂN TÍCH HỆ THỐNG SOPHOS</div>
+      <div class="table-grid">
+        <div class="table-box">
+          <div class="box-head">Bảng cảnh báo Sophos</div>
+          <div class="box-body">
+            <table class="tbl">
+              <thead><tr><th>Cảnh báo</th><th style="width:120px">Số lượng</th><th>Thông tin</th></tr></thead>
+              <tbody id="tbl_soph_events"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="table-box">
+          <div class="box-head">Danh sách User có nhiều hoạt động bất thường</div>
+          <div class="box-body">
+            <table class="tbl">
+              <thead><tr><th>User</th><th>Entity</th><th style="width:120px">Detections</th></tr></thead>
+              <tbody id="tbl_soph_users"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-box full" style="margin-top:12px">
+        <div class="chart-title">⚠️Danh sách Users ghi nhận nhiều lần truy Web Malware</div>
+        <div class="canvas-wrap" style="height:320px"><canvas id="c_soph_webmal"></canvas></div>
+      </div>
+
+      <div class="section-title">🛡️ PHÂN TÍCH HỆ THỐNG WAZUH</div>
+      <div class="table-box">
+        <div class="box-head">Domain & Sessions</div>
+        <div class="box-body">
+          <table class="tbl">
+            <thead><tr><th>Domain/Event</th><th style="width:140px">Sessions</th></tr></thead>
+            <tbody id="tbl_wazuh_events"></tbody>
+          </table>
+        </div>
+        <div class="note" style="padding:6px 12px">Hiển thị tối đa Top 10 theo Sessions, tự sắp xếp giảm dần.</div>
+      </div>
+    </section>
+
+    <!-- PAGE 3: SERVER/FIREWALL STATUS -->
+    <section id="page-servers" class="panel hidden">
+      <div id="exportHeaderSrv" class="export-header">
+        <div class="left">
+          <div class="ttl">🛡️ SOC Dashboard – Netmarks VN</div>
+          <div class="sub">Giám sát An ninh Mạng của phòng SOC trực thuộc công ty Netmarks Việt Nam</div>
+          <div class="sub" id="exportSrvMeta"></div>
+        </div>
+        <div class="right"><span class="badge-report badge-srv">BÁO CÁO SERVER/FIREWALL</span></div>
+      </div>
+
+      <div class="section-head hide-when-export">
+        <div class="note">Chọn tuần để hiển thị</div>
+        <div class="actions">
+          <select id="weekPickerSrv"></select>
+          <button class="btn ghost" id="btnEditWeekSrv" type="button">✏️ Sửa tuần này</button>
+          <button class="btn ghost" id="btnDuplicateWeekSrv" type="button">📄 Nhân bản tuần</button>
+          <button class="btn danger" id="btnDeleteWeekSrv" type="button">🗑️ Xóa tuần</button>
+          <button class="btn primary" id="btnExportSrvPDF" type="button">🖨️ Xuất PDF trang này</button>
+        </div>
+      </div>
+
+      <div class="section-title">📊 Tổng quan hệ thống</div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="num" id="st_srv">0</div><div class="lbl">Server giám sát </div></div>
+        <div class="stat-card"><div class="num" id="st_fw">0</div><div class="lbl">Thiết bị Firewall </div></div>
+        <div class="stat-card"><div class="num" id="st_avg">0%</div><div class="lbl">Uptime hệ thống</div></div>
+      </div>
+
+      <div class="section-title">🖥️ Hiệu năng CPU Server</div>
+      <div class="table-box">
+        <div class="box-head">Bảng CPU</div>
+        <div class="box-body">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>Server</th>
+                <th style="width:120px">CPU Min</th>
+                <th style="width:120px">CPU Max</th>
+                <th style="width:120px">CPU Avg</th>
+                <th style="width:160px">Trạng thái</th>
+                <th>Cảnh báo</th>
+              </tr>
+            </thead>
+            <tbody id="tbl_srv_cpu"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="section-title">🧠 Hiệu năng RAM Server</div>
+      <div class="table-box" style="margin-top:10px">
+        <div class="box-head">Bảng RAM</div>
+        <div class="box-body">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>Server</th>
+                <th style="width:120px">RAM Min</th>
+                <th style="width:120px">RAM Max</th>
+                <th style="width:120px">RAM Avg</th>
+                <th style="width:160px">Trạng thái</th>
+                <th>Cảnh báo</th>
+              </tr>
+            </thead>
+            <tbody id="tbl_srv_ram"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="section-title">💽 Tình trạng ổ đĩa Server</div>
+      <div class="table-box" style="margin-top:10px">
+        <div class="box-head">Bảng Ổ Đĩa</div>
+        <div class="box-body">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>Server</th>
+                <th style="width:90px">C:\</th>
+                <th style="width:90px">D:\</th>
+                <th style="width:90px">E:\</th>
+                <th style="width:90px">F:\</th>
+                <th style="width:160px">Trạng thái</th>
+                <th>Cảnh báo</th>
+              </tr>
+            </thead>
+            <tbody id="tbl_srv_disk"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="section-title">🛡️ TÌNH TRẠNG FIREWALL</div>
+      <div class="alert-box red" id="fwIssueBox">
+        <div style="font-weight:700;margin-bottom:6px">⚠️ Vấn đề cần xử lý:</div>
+        <ul class="bullet" id="fw_issue_ul"></ul>
+      </div>
+      <div class="table-box" style="margin-top:10px">
+        <div class="box-head">Bảng Firewall</div>
+        <div class="box-body">
+          <table class="tbl">
+            <thead><tr><th>Thiết bị</th><th style="width:120px">CPU Max</th><th style="width:140px">Memory Max</th><th style="width:160px">Trạng thái</th><th>Ghi chú</th></tr></thead>
+            <tbody id="tbl_fw_info"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+
+<script>
+const KEY='soc_weeks', LAST='soc_last_saved';
+const SEL_CHARTS='soc_sel_idx_charts';
+const SEL_SRV='soc_sel_idx_srv';
+const $=(s,sc=document)=>sc.querySelector(s); const $$=(s,sc=document)=>Array.from(sc.querySelectorAll(s));
+function load(){ try{return JSON.parse(localStorage.getItem(KEY)||'[]')}catch{return[]} }
+function save(arr){ localStorage.setItem(KEY, JSON.stringify(arr)); }
+function toISO(val){ if(!val) return ''; const d=new Date(val); if(Number.isNaN(+d)) return ''; const z=new Date(d.getTime()-d.getTimezoneOffset()*60000); return z.toISOString().slice(0,10); }
+function fmtLabel2(val){ const d=new Date(val); if(Number.isNaN(+d)) return val||''; const dd=String(d.getDate()).padStart(2,'0'); const mm=String(d.getMonth()+1).padStart(2,'0'); return dd+'-'+mm; }
+function last7(){ const t=new Date(); return Array.from({length:7},(_,i)=>{const d=new Date(t); d.setDate(t.getDate()-(6-i)); const z=new Date(d.getTime()-d.getTimezoneOffset()*60000); return z.toISOString().slice(0,10);}); }
+function fmtIntVi(n){ return (Number(n)||0).toLocaleString('vi-VN'); }
+function escapeHTML(str){ return String(str).replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' }[m])); }
+function fmtDateVi(iso){ if(!iso) return ''; const d=new Date(iso+'T00:00:00'); if(Number.isNaN(+d)) return iso; return d.toLocaleDateString('vi-VN'); }
+function fmtRange(wa,we){ const a=fmtDateVi(wa), b=fmtDateVi(we); return a&&b?`${a} – ${b}`:(a||b||''); }
+function sanitizeFile(s){ return s.replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,'_'); }
+
+// Optional API sync (kept)
+async function apiLoad(){ const r = await fetch('/api/weeks', { credentials: 'include' }); if(!r.ok) throw new Error('api_load_fail'); return await r.json(); }
+async function apiSave(arr){
+  const r = await fetch('/api/weeks', { method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'include', body:JSON.stringify(arr) });
+  if(!r.ok) throw new Error('api_save_fail'); return true;
+}
+async function saveAndSync(arr){ save(arr); try{ await apiSave(arr); }catch(e){ console.warn('API save fail', e); } }
+async function trySyncFromServer(){ try{ const srv=await apiLoad(); if(Array.isArray(srv)) save(srv); }catch(e){ console.warn('API load fail', e); } }
+
+// Tabs
+const tabs=$$('.tab');
+tabs.forEach(b=>b.onclick=()=>{ tabs.forEach(x=>x.classList.remove('active')); b.classList.add('active');
+  ['page-input','page-charts','page-servers'].forEach(id=>document.getElementById(id).classList.add('hidden'));
+  document.getElementById(b.dataset.tab).classList.remove('hidden');
+  if(b.dataset.tab==='page-charts'){ fillWeekPicker(); renderCharts(); }
+  if(b.dataset.tab==='page-servers'){ fillWeekPickerSrv(); renderServerInfo(); }
+});
+
+// INPUT actions
+function addDay(sel){ const t=$('#tplDay').content.cloneNode(true); $(sel).appendChild(t); }
+function addEvent(sel){ const t=$('#tplEvent').content.cloneNode(true); $(sel).appendChild(t); }
+function addSophUser(){ const t=$('#tplSophUser').content.cloneNode(true); $('#sophUsers').appendChild(t); }
+function addWazuh(){ const t=$('#tplWazuh').content.cloneNode(true); $('#wazuhEvents').appendChild(t); }
+function addZbxLogin(){ const t=$('#tplZbxLogin').content.cloneNode(true); $('#zbxLogin').appendChild(t); }
+function addSophWebMal(){ const t=$('#tplSophWebMal').content.cloneNode(true); $('#sophWebMal').appendChild(t); }
+function addServer(){ const t=$('#tplServer').content.cloneNode(true); $('#serverList').appendChild(t); }
+function addSrvCPU(){ const t=$('#tplSrvCPU').content.cloneNode(true); $('#srvCPU').appendChild(t); }
+function addSrvRAM(){ const t=$('#tplSrvRAM').content.cloneNode(true); $('#srvRAM').appendChild(t); }
+function addSrvDisk(){ const t=$('#tplSrvDisk').content.cloneNode(true); $('#srvDisk').appendChild(t); }
+function addBullet(sel){ const t=$('#tplBullet').content.cloneNode(true); $(sel).appendChild(t); }
+function addFwInfo(){ const t=$('#tplFwInfo').content.cloneNode(true); $('#fwInfo').appendChild(t); }
+
+$('#addZbxDay').onclick=()=>addDay('#zbxDays'); $('#addSophDay').onclick=()=>addDay('#sophDays');
+$('#clrZbxDays').onclick=()=>$('#zbxDays').innerHTML=''; $('#clrSophDays').onclick=()=>$('#sophDays').innerHTML='';
+$('#addZbxEvent').onclick=()=>addEvent('#zbxEvents'); $('#addSophEvent').onclick=()=>addEvent('#sophEvents');
+$('#clrZbxEvents').onclick=()=>$('#zbxEvents').innerHTML=''; $('#clrSophEvents').onclick=()=>$('#sophEvents').innerHTML='';
+$('#addSophUser').onclick=()=>addSophUser(); $('#clrSophUsers').onclick=()=>$('#sophUsers').innerHTML='';
+$('#addWazuhEvent').onclick=()=>addWazuh(); $('#clrWazuhEvents').onclick=()=>$('#wazuhEvents').innerHTML='';
+$('#addZbxLogin').onclick=()=>addZbxLogin(); $('#clrZbxLogin').onclick=()=>$('#zbxLogin').innerHTML='';
+$('#addSophWebMal').onclick=()=>addSophWebMal(); $('#clrSophWebMal').onclick=()=>$('#sophWebMal').innerHTML='';
+
+$('#addSrvCPU').onclick=addSrvCPU; $('#clrSrvCPU').onclick=()=>$('#srvCPU').innerHTML='';
+$('#addSrvRAM').onclick=addSrvRAM; $('#clrSrvRAM').onclick=()=>$('#srvRAM').innerHTML='';
+$('#addSrvDisk').onclick=addSrvDisk; $('#clrSrvDisk').onclick=()=>$('#srvDisk').innerHTML='';
+
+$('#addServer').onclick=()=>addServer(); $('#clrServers').onclick=()=>$('#serverList').innerHTML='';
+
+$('#addFwIssue').onclick=()=>addBullet('#fwIssues'); $('#clrFwIssue').onclick=()=>$('#fwIssues').innerHTML='';
+$('#addFwInfo').onclick=addFwInfo; $('#clrFwInfo').onclick=()=>$('#fwInfo').innerHTML='';
+
+['zbxDays','sophDays','zbxEvents','sophEvents','sophUsers','wazuhEvents','zbxLogin','sophWebMal','serverList','srvCPU','srvRAM','srvDisk','fwIssues','fwInfo'].forEach(id=>{
+  const el=document.getElementById(id); if(!el) return;
+  el.addEventListener('click',e=>{ if(e.target.closest('.btn-del')) e.target.closest('.card').remove(); });
+});
+function last7Fill(addFn, containerSel){
+  last7().forEach(d=>{ addFn(); const el=$$(containerSel+' .day').slice(-1)[0]; if(el){ $('.d_date',el).value=d; $('.d_count',el).value=0; } });
+}
+$('#btnSeed7Zbx').onclick=()=>last7Fill(()=>addDay('#zbxDays'), '#zbxDays');
+$('#btnSeed7Soph').onclick=()=>last7Fill(()=>addDay('#sophDays'), '#sophDays');
+
+// Export/Import JSON
+$('#btnExportAll').onclick=()=>{ const blob=new Blob([JSON.stringify(load(),null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='soc_weeks.json'; a.click(); URL.revokeObjectURL(a.href); };
+$('#btnImportFile').onclick=()=>$('#fileJSON').click();
+$('#fileJSON').onchange=e=>{ const f=e.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ try{ const arr=JSON.parse(rd.result||'[]'); if(Array.isArray(arr)) save(arr); alert('Đã import JSON vào localStorage'); fillWeekPicker(); renderCharts(); fillWeekPickerSrv(); renderServerInfo(); }catch{ alert('JSON không hợp lệ'); } }; rd.readAsText(f); e.target.value=''; };
+
+// Collect & Fill
+function collectForm(){
+  const pickDays = sel => $$(sel+' .day').map(el=>({ date: toISO($('.d_date',el).value), count: Number($('.d_count',el).value||0) })).filter(x=>x.date);
+  const pickEv   = sel => $$(sel+' .evt').map(el=>({ name: ($('.e_name',el).value||'').trim(), count: Number($('.e_count',el).value||0), info: ($('.e_info',el).value||'').trim() })).filter(x=>x.name);
+  const pickSophUsers = () => $$('#sophUsers .su').map(el=>({ user:($('.u_user',el).value||'').trim(), entity:($('.u_entity',el).value||'').trim(), detections:Number($('.u_count',el).value||0) })).filter(x=>x.user||x.entity);
+  const pickWazuh = () => $$('#wazuhEvents .wz').map(el=>({ name:($('.w_name',el).value||'').trim(), sessions:Number($('.w_count',el).value||0) })).filter(x=>x.name);
+  const pickZbxLogin = () => $$('#zbxLogin .zl').map(el=>({ name:($('.zl_name',el).value||'').trim(), count:Number($('.zl_count',el).value||0) })).filter(x=>x.name);
+  const pickSophWebMal = () => $$('#sophWebMal .swm').map(el=>({ name:($('.swm_name',el).value||'').trim(), count:Number($('.swm_count',el).value||0) })).filter(x=>x.name);
+
+  const pickSrvCPU = () => $$('#srvCPU .sc').map(el=>({ name:($('.sc_name',el).value||'').trim(), cpu_min:Number($('.sc_min',el).value||''), cpu_max:Number($('.sc_max',el).value||''), cpu_avg:Number($('.sc_avg',el).value||''), status:($('.sc_status',el).value||'').trim()||'BÌNH THƯỜNG', alert:($('.sc_alert',el).value||'').trim() })).filter(x=>x.name);
+  const pickSrvRAM = () => $$('#srvRAM .sr').map(el=>({ name:($('.sr_name',el).value||'').trim(), ram_min:Number($('.sr_min',el).value||''), ram_max:Number($('.sr_max',el).value||''), ram_avg:Number($('.sr_avg',el).value||''), status:($('.sr_status',el).value||'').trim()||'BÌNH THƯỜNG', alert:($('.sr_alert',el).value||'').trim() })).filter(x=>x.name);
+  const pickSrvDisk = () => $$('#srvDisk .sd').map(el=>({ name:($('.sd_name',el).value||'').trim(), disk_c:Number($('.sd_c',el).value||''), disk_d:Number($('.sd_d',el).value||''), disk_e:Number($('.sd_e',el).value||''), disk_f:Number($('.sd_f',el).value||''), status:($('.sd_status',el).value||'').trim()||'BÌNH THƯỜNG', alert:($('.sd_alert',el).value||'').trim() })).filter(x=>x.name);
+
+  const pickFwIssues = () => $$('#fwIssues .bl').map(el=>($('.bl_text',el).value||'').trim()).filter(x=>x);
+  const pickFwInfo   = () => $$('#fwInfo .fwi').map(el=>({ name:($('.fwi_name',el).value||'').trim(), cpu_max:($('.fwi_cpu',el).value!==''? Number($('.fwi_cpu',el).value):'N/A'), mem_max:($('.fwi_mem',el).value!==''? Number($('.fwi_mem',el).value):'N/A'), status:($('.fwi_status',el).value||'').trim()||'BÌNH THƯỜNG', note:($('.fwi_note',el).value||'').trim() })).filter(x=>x.name);
+
+  const pickSrvLegacy = () => $$('#serverList .srv').map(el=>({ name:$('.sv_name',el).value, cpu_avg:Number($('.sv_cpu',el).value||0), mem_used_pct:Number($('.sv_mem',el).value||0), disk_used_pct:Number($('.sv_disk',el).value||0), uptime_pct:Number($('.sv_up',el).value||0), alerts:Number($('.sv_alerts',el).value||0) })).filter(x=>x.name);
+
+  const w={
+    week_no: Number($('#week_no').value||0) || undefined,
+    week_start: toISO($('#w_start').value), week_end: toISO($('#w_end').value),
+    customer: $('#customer').value||'', prepared_by: $('#prepared_by').value||'',
+    daily_zabbix: pickDays('#zbxDays'), daily_sophos: pickDays('#sophDays'),
+    zabbix_events: pickEv('#zbxEvents'), sophos_events: pickEv('#sophEvents'),
+    sophos_users: pickSophUsers(),
+    wazuh_events: pickWazuh(),
+    zabbix_login_fails: pickZbxLogin(),
+    sophos_web_malware: pickSophWebMal(),
+    overview: {
+      time_per_server_hours:Number($('#ov_time_per_srv').value||0),
+      servers_down:Number($('#ov_srv_down').value||0),
+      downtime_per_down_server_hours:Number($('#ov_down_per_srv').value||0)
+    },
+    servers_cpu: pickSrvCPU(),
+    servers_ram: pickSrvRAM(),
+    servers_disks: pickSrvDisk(),
+    firewall_issues: pickFwIssues(),
+    firewalls_info: pickFwInfo(),
+    servers: pickSrvLegacy()
+  };
+  return w;
+}
+function fillForm(w){
+  const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=(v??''); };
+  set('week_no',w.week_no||''); set('w_start',w.week_start||''); set('w_end',w.week_end||''); set('customer',w.customer||''); set('prepared_by',w.prepared_by||'');
+
+  set('ov_time_per_srv', w.overview?.time_per_server_hours ?? '');
+  set('ov_srv_down', w.overview?.servers_down ?? '');
+  set('ov_down_per_srv', w.overview?.downtime_per_down_server_hours ?? '');
+
+  ['zbxDays','sophDays','zbxEvents','sophEvents','sophUsers','wazuhEvents','zbxLogin','sophWebMal','serverList','srvCPU','srvRAM','srvDisk','fwIssues','fwInfo'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=''; });
+
+  (w.daily_zabbix||[]).forEach(d=>{ addDay('#zbxDays'); const el=$$('#zbxDays .day').slice(-1)[0]; $('.d_date',el).value=d.date||''; $('.d_count',el).value=d.count||0; });
+  (w.daily_sophos||[]).forEach(d=>{ addDay('#sophDays'); const el=$$('#sophDays .day').slice(-1)[0]; $('.d_date',el).value=d.date||''; $('.d_count',el).value=d.count||0; });
+  (w.zabbix_events||[]).forEach(e=>{ addEvent('#zbxEvents'); const el=$$('#zbxEvents .evt').slice(-1)[0]; $('.e_name',el).value=e.name||''; $('.e_count',el).value=e.count||0; $('.e_info',el).value=e.info||''; });
+  (w.sophos_events||[]).forEach(e=>{ addEvent('#sophEvents'); const el=$$('#sophEvents .evt').slice(-1)[0]; $('.e_name',el).value=e.name||''; $('.e_count',el).value=e.count||0; $('.e_info',el).value=e.info||''; });
+  (w.sophos_users||[]).forEach(u=>{ addSophUser(); const el=$$('#sophUsers .su').slice(-1)[0]; $('.u_user',el).value=u.user||''; $('.u_entity',el).value=u.entity||''; $('.u_count',el).value=u.detections||0; });
+  (w.wazuh_events||[]).forEach(r=>{ addWazuh(); const el=$$('#wazuhEvents .wz').slice(-1)[0]; $('.w_name',el).value=r.name||''; $('.w_count',el).value=r.sessions||0; });
+  (w.zabbix_login_fails||[]).forEach(r=>{ addZbxLogin(); const el=$$('#zbxLogin .zl').slice(-1)[0]; $('.zl_name',el).value=r.name||''; $('.zl_count',el).value=r.count||0; });
+  (w.sophos_web_malware||[]).forEach(r=>{ addSophWebMal(); const el=$$('#sophWebMal .swm').slice(-1)[0]; $('.swm_name',el).value=r.name||''; $('.swm_count',el).value=r.count||0; });
+
+  (w.servers_cpu||[]).forEach(s=>{ addSrvCPU(); const el=$$('#srvCPU .sc').slice(-1)[0]; $('.sc_name',el).value=s.name||''; $('.sc_min',el).value=s.cpu_min??0; $('.sc_max',el).value=s.cpu_max??0; $('.sc_avg',el).value=s.cpu_avg??0; $('.sc_status',el).value=s.status||'BÌNH THƯỜNG'; $('.sc_alert',el).value=s.alert||''; });
+  (w.servers_ram||[]).forEach(s=>{ addSrvRAM(); const el=$$('#srvRAM .sr').slice(-1)[0]; $('.sr_name',el).value=s.name||''; $('.sr_min',el).value=s.ram_min??0; $('.sr_max',el).value=s.ram_max??0; $('.sr_avg',el).value=s.ram_avg??0; $('.sr_status',el).value=s.status||'BÌNH THƯỜNG'; $('.sr_alert',el).value=s.alert||''; });
+  (w.servers_disks||[]).forEach(s=>{ addSrvDisk(); const el=$$('#srvDisk .sd').slice(-1)[0]; $('.sd_name',el).value=s.name||''; $('.sd_c',el).value=s.disk_c??0; $('.sd_d',el).value=s.disk_d??0; $('.sd_e',el).value=s.disk_e??0; $('.sd_f',el).value=s.disk_f??0; $('.sd_status',el).value=s.status||'BÌNH THƯỜNG'; $('.sd_alert',el).value=s.alert||''; });
+
+  (w.firewall_issues||[]).forEach(t=>{ addBullet('#fwIssues'); const el=$$('#fwIssues .bl').slice(-1)[0]; $('.bl_text',el).value=t; });
+  (w.firewalls_info||[]).forEach(f=>{ addFwInfo(); const el=$$('#fwInfo .fwi').slice(-1)[0]; $('.fwi_name',el).value=f.name||''; $('.fwi_cpu',el).value=(typeof f.cpu_max==='number'?f.cpu_max:''); $('.fwi_mem',el).value=(typeof f.mem_max==='number'?f.mem_max:''); $('.fwi_status',el).value=f.status||'BÌNH THƯỜNG'; $('.fwi_note',el).value=f.note||''; });
+
+  (w.servers||[]).forEach(s=>{ addServer(); const el=$$('#serverList .srv').slice(-1)[0]; $('.sv_name',el).value=s.name||''; $('.sv_cpu',el).value=s.cpu_avg||0; $('.sv_mem',el).value=s.mem_used_pct||0; $('.sv_disk',el).value=s.disk_used_pct||0; $('.sv_up',el).value=s.uptime_pct||99.9; $('.sv_alerts',el).value=s.alerts||0; });
+
+  $('#stateMsg').textContent='Trạng thái: Đang chỉnh sửa dữ liệu';
+}
+
+// Save
+$('#btnSaveWeek').onclick = async () => {
+  const w = collectForm();
+  if(!w.week_start || !w.week_end){ alert('Vui lòng nhập Từ ngày và Đến ngày'); return; }
+  let all = load();
+  const key = w.week_start+'__'+w.week_end;
+  const idx = all.findIndex(x=>(x.week_start+'__'+x.week_end)===key);
+  if(idx>=0) all[idx]=w; else all.push(w);
+  all.sort((a,b)=>(a.week_start||'').localeCompare(b.week_start||''));
+  try{ await saveAndSync(all); localStorage.setItem(LAST, key); $('#stateMsg').textContent='Đã lưu tuần & đồng bộ server.'; }
+  catch(e){ save(all); localStorage.setItem(LAST, key); $('#stateMsg').textContent='Đã lưu tuần (server không khả dụng).'; }
+};
+$('#btnGoCharts').onclick=()=>{ document.querySelector('.tab[data-tab="page-charts"]').click(); };
+
+// Duplicate
+function duplicateWeekFromIndex(idx){
+  const all=load(); const src=all[idx]; if(!src) return;
+  const copy=JSON.parse(JSON.stringify(src)); copy.week_start=''; copy.week_end='';
+  document.querySelector('.tab[data-tab="page-input"]').click(); fillForm(copy);
+  $('#stateMsg').textContent='Đang chỉnh sửa BẢN SAO — nhập ngày mới rồi Lưu tuần.';
+}
+
+// Charts (page 2)
+const weekPicker=$('#weekPicker'); let charts={};
+function killCharts(){ Object.values(charts).forEach(c=>{try{c.destroy()}catch(_){}}); charts={}; }
+// Tạo thang Y có khoảng trống phía trên để số không bị chạm mép
+function intTicks(max){
+  const m = Number(max)||0;
+  const pad = Math.max(1, Math.ceil(m*0.1)); // +10% headroom, tối thiểu 1
+  return {
+    beginAtZero:true,
+    ticks:{precision:0, stepSize:1, callback:v=>Number.isInteger(v)?v:''},
+    suggestedMax: Math.max(5, Math.ceil(m+pad))
+  };
+}
+
+/* ====== Plugin: vẽ nhãn số ở giữa cột/thanh & trên điểm Line, luôn nằm trong chartArea ====== */
+const valueLabelPlugin = {
+  id:'valueLabel',
+  afterDatasetsDraw(chart, args, opts){
+    const {ctx, chartArea} = chart;
+    if(!chartArea) return;
+    ctx.save();
+    // clip để không vẽ tràn ra ngoài
+    ctx.beginPath();
+    ctx.rect(chartArea.left, chartArea.top, chartArea.right-chartArea.left, chartArea.bottom-chartArea.top);
+    ctx.clip();
+
+    const family = (Chart.defaults.font && Chart.defaults.font.family) ? Chart.defaults.font.family : 'Segoe UI, system-ui, sans-serif';
+    const fontSize = opts?.font?.size || 12;
+    const fontWeight = opts?.font?.weight || '700';
+
+    (chart.data.datasets||[]).forEach((ds, di)=>{
+      const meta = chart.getDatasetMeta(di);
+      if(!meta || meta.hidden) return;
+
+      meta.data.forEach((el,i)=>{
+        const val = ds?.data?.[i];
+        if(val==null || val==='') return;
+        let x = el.x, y = el.y;
+
+        ctx.font = `${fontWeight} ${fontSize}px ${family}`;
+        if(meta.type==='bar'){
+          // giữa thanh/cột
+          if((chart.options.indexAxis || 'x')==='y'){ // horizontal
+            x = (el.base + el.x)/2;
+            y = el.y;
+          }else{ // vertical
+            x = el.x;
+            y = (el.base + el.y)/2;
+          }
+          // đảm bảo nằm trong chartArea
+          x = Math.max(chartArea.left+8, Math.min(chartArea.right-8, x));
+          y = Math.max(chartArea.top+8, Math.min(chartArea.bottom-8, y));
+
+          ctx.textAlign='center';
+          ctx.textBaseline='middle';
+          // viền tối để dễ đọc trên nền màu
+          ctx.lineWidth=3;
+          ctx.strokeStyle='rgba(0,0,0,.55)';
+          ctx.strokeText(String(val), x, y);
+          ctx.fillStyle = opts?.barColor || '#ffffff';
+          ctx.fillText(String(val), x, y);
+        }else if(meta.type==='line'){
+          // phía trên điểm; nếu quá sát mép trên thì hạ xuống
+          x = Math.max(chartArea.left+4, Math.min(chartArea.right-4, el.x));
+          y = Math.max(chartArea.top+12, el.y - 8);
+          ctx.textAlign='center';
+          ctx.textBaseline='bottom';
+          ctx.fillStyle = opts?.lineColor || '#111827';
+          ctx.fillText(String(val), x, y);
+        }
+      });
+    });
+
+    ctx.restore();
+  }
+};
+try{ Chart.register(valueLabelPlugin); }catch(e){ console.warn('register plugin fail', e); }
+/* ====== /Plugin ====== */
+
+function fillWeekPicker(){
+  const all=load(); weekPicker.innerHTML='';
+  if(!all.length){
+    const o=document.createElement('option'); o.value='-1'; o.textContent='Chưa có dữ liệu'; weekPicker.appendChild(o);
+    return;
+  }
+  all.forEach((w,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=[fmtLabel2(w.week_start),'–',fmtLabel2(w.week_end),w.customer||null].filter(Boolean).join(' '); weekPicker.appendChild(o); });
+  let idx = parseInt(localStorage.getItem(SEL_CHARTS)||'',10);
+  if(Number.isNaN(idx) || idx<0 || idx>=all.length){
+    const lastKey=localStorage.getItem(LAST);
+    idx = all.length-1;
+    if(lastKey){ const i=all.findIndex(x=>(x.week_start+'__'+x.week_end)===lastKey); if(i>=0) idx=i; }
+  }
+  weekPicker.value=String(idx);
+  localStorage.setItem(SEL_CHARTS, String(idx));
+}
+function renderCharts(){
+  killCharts();
+  const all=load(); if(!all.length) return;
+  const idx=Number(weekPicker.value ?? all.length-1); const w=all[idx]||{};
+  const z=(w.daily_zabbix||[]).filter(x=>x.date).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  const s=(w.daily_sophos||[]).filter(x=>x.date).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  const zLbl=z.map(x=>fmtLabel2(x.date)); const zVal=z.map(x=>Number(x.count)||0);
+  const sLbl=s.map(x=>fmtLabel2(x.date)); const sVal=s.map(x=>Number(x.count)||0);
+  const zMax=Math.max(0,...zVal), sMax=Math.max(0,...sVal);
+
+  const topt=new Map();
+  (w.zabbix_events||[]).forEach(e=>{ if(!e||!e.name) return; topt.set(e.name,(topt.get(e.name)||0)+(Number(e.count)||0)); });
+  (w.sophos_events||[]).forEach(e=>{ if(!e||!e.name) return; topt.set(e.name,(topt.get(e.name)||0)+(Number(e.count)||0)); });
+  const top=Array.from(topt.entries()).map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count).slice(0,8);
+  const tLbl=top.length? top.map(x=> (x.name && String(x.name).trim()) ? x.name : 'Khác'):['Không có dữ liệu'];
+  const tVal=top.length? top.map(x=>x.count):[0];
+
+  charts.z = new Chart($('#c_zbx').getContext('2d'), {
+    type:'line',
+    data:{labels:zLbl,datasets:[{label:'Zabbix',data:zVal,borderColor:'#60a5fa',backgroundColor:'rgba(96,165,250,.15)',tension:.35,fill:true}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      layout:{padding:{top:12}}, // khoảng trống phía trên
+      plugins:{legend:{display:false}, valueLabel:{font:{size:12}}},
+      elements:{point:{radius:3, hoverRadius:4}},
+      scales:{y:intTicks(zMax)}
+    }
+  });
+  charts.s = new Chart($('#c_soph').getContext('2d'), {
+    type:'line',
+    data:{labels:sLbl,datasets:[{label:'Sophos',data:sVal,borderColor:'#ef4444',backgroundColor:'rgba(239,68,68,.15)',tension:.35,fill:true}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      layout:{padding:{top:12}},
+      plugins:{legend:{display:false}, valueLabel:{font:{size:12}}},
+      elements:{point:{radius:3, hoverRadius:4}},
+      scales:{y:intTicks(sMax)}
+    }
+  });
+  charts.t = new Chart($('#c_top').getContext('2d'), {
+    type:'doughnut',
+    data:{labels:tLbl,datasets:[{data:tVal,backgroundColor:['#ef4444','#f59e0b','#10b981','#3b82f6','#a855f7','#14b8a6','#f97316','#6366f1']} ]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{
+          position:'bottom',
+          labels:{
+            generateLabels:(chart)=>{
+              const labels = chart.data.labels || [];
+              const ds = chart.data.datasets?.[0] || {};
+              const colors = ds.backgroundColor || [];
+              const meta = chart.getDatasetMeta(0);
+              return labels.map((raw,i)=>{
+                const name = (raw!=null && String(raw).trim()!=='') ? String(raw) : 'Khác';
+                return {
+                  text: `${name} (${ds.data?.[i] ?? 0})`,
+                  fillStyle: colors[i] || '#999',
+                  strokeStyle: '#fff',
+                  hidden: meta?.data?.[i]?.hidden || false,
+                  index: i
+                };
+              });
+            }
+          }
+        }
+      }
+    }
+  });
+
+  renderAnalysisTables(w);
+  renderZabbixExtraCharts(w);
+  renderSophosExtraCharts(w);
+
+  $('#exportChartsMeta').textContent = [w.customer||'', w.prepared_by||'', fmtRange(w.week_start,w.week_end)||''].filter(Boolean).join(' • ');
+}
+weekPicker.onchange=()=>{ localStorage.setItem(SEL_CHARTS, String(weekPicker.value)); renderCharts(); };
+
+$('#btnDuplicateWeek').onclick=()=>{ const all=load(); const idx=Number(weekPicker.value ?? all.length-1); duplicateWeekFromIndex(idx); };
+$('#btnDeleteWeek').onclick=()=>{ const all=load(); const idx=Number(weekPicker.value ?? all.length-1); if(idx<0||!all.length) return; if(!confirm('Xóa tuần đã chọn?')) return; all.splice(idx,1); save(all); fillWeekPicker(); renderCharts(); fillWeekPickerSrv(); renderServerInfo(); };
+$('#btnEditWeek').onclick=()=>{ const all=load(); const idx=Number(weekPicker.value ?? all.length-1); document.querySelector('.tab[data-tab="page-input"]').click(); fillForm(all[idx]||{}); };
+
+function clsCountGeneric(n){ n=Number(n)||0; if(n>=50) return 'bad'; if(n>=10) return 'warn'; return 'good'; }
+function clsCountWazuh(n){ n=Number(n)||0; if(n>=1000) return 'bad'; if(n>=300) return 'warn'; return 'good'; }
+function setEmptyRow(tbody, text='Không có dữ liệu'){ const cols = tbody?.closest('table')?.querySelectorAll('thead th')?.length || 3; tbody.innerHTML=`<tr><td class="muted" colspan="${cols}">${text}</td></tr>`; }
+
+function renderAnalysisTables(w){
+  const zBody=$('#tbl_zbx_events'); const sBody=$('#tbl_soph_events'); const uBody=$('#tbl_soph_users'); const wBody=$('#tbl_wazuh_events');
+  if(!zBody||!sBody||!uBody||!wBody) return;
+  zBody.innerHTML=''; sBody.innerHTML=''; uBody.innerHTML=''; wBody.innerHTML='';
+
+  if(!w){ setEmptyRow(zBody); setEmptyRow(sBody); setEmptyRow(uBody); setEmptyRow(wBody); return; }
+  const esc=escapeHTML;
+
+  const zlist=(w.zabbix_events||[]).slice().sort((a,b)=>(b.count||0)-(a.count||0));
+  if(!zlist.length){ setEmptyRow(zBody); } else zlist.forEach(e=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${esc(e.name||'-')}</td><td class="td-center"><span class="count-badge ${clsCountGeneric(e.count)}">${fmtIntVi(e.count)}</span></td><td>${esc((e.info||'-')).replace(/\n/g,'<br>')}</td>`; zBody.appendChild(tr); });
+
+  const slist=(w.sophos_events||[]).slice().sort((a,b)=>(b.count||0)-(a.count||0));
+  if(!slist.length){ setEmptyRow(sBody); } else slist.forEach(e=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${esc(e.name||'-')}</td><td class="td-center"><span class="count-badge ${clsCountGeneric(e.count)}">${fmtIntVi(e.count)}</span></td><td>${esc((e.info||'Đã xử lý')).replace(/\n/g,'<br>')}</td>`; sBody.appendChild(tr); });
+
+  const ulist=(w.sophos_users||[]).slice().sort((a,b)=>(b.detections||0)-(a.detections||0));
+  if(!ulist.length){ setEmptyRow(uBody); } else ulist.forEach(u=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${esc(u.user||'-')}</td><td>${esc(u.entity||'-')}</td><td class="td-center"><span class="count-badge ${clsCountGeneric(u.detections)}">${fmtIntVi(u.detections)}</span></td>`; uBody.appendChild(tr); });
+
+  const wlist=(w.wazuh_events||[]).slice().sort((a,b)=>(b.sessions||0)-(a.sessions||0)).slice(0,10);
+  if(!wlist.length){ setEmptyRow(wBody); } else wlist.forEach(r=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${esc(r.name||'-')}</td><td class="td-center"><span class="count-badge ${clsCountWazuh(r.sessions)}">${fmtIntVi(r.sessions)}</span></td>`; wBody.appendChild(tr); });
+}
+
+function renderZabbixExtraCharts(w){
+  const ctxTop=$('#c_zbx_top10')?.getContext('2d'); if(ctxTop){ try{charts.zTop10?.destroy()}catch{} }
+  const ctxLogin=$('#c_zbx_login')?.getContext('2d'); if(ctxLogin){ try{charts.zLogin?.destroy()}catch{} }
+
+  if(ctxTop){
+    const list=(w?.zabbix_events||[]).filter(e=>e&&e.name).slice().sort((a,b)=>(b.count||0)-(a.count||0)).slice(0,10);
+    const labels=list.length? list.map(e=>e.name):['Không có dữ liệu']; const data=list.length? list.map(e=>+e.count||0):[0];
+    charts.zTop10=new Chart(ctxTop,{
+      type:'bar',
+      data:{labels,datasets:[{data,backgroundColor:'#3b82f6'}]},
+      options:{
+        indexAxis:'y',
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false}, valueLabel:{font:{size:12}}},
+        scales:{x:intTicks(Math.max(0,...data))}
+      }
+    });
+  }
+  if(ctxLogin){
+    const list=(w?.zabbix_login_fails||[]).filter(r=>r&&r.name).slice().sort((a,b)=>(b.count||0)-(a.count||0)).slice(0,10);
+    const labels=list.length? list.map(e=>e.name):['Không có dữ liệu']; const data=list.length? list.map(e=>+e.count||0):[0];
+    charts.zLogin=new Chart(ctxLogin,{
+      type:'bar',
+      data:{labels,datasets:[{data,backgroundColor:'#f59e0b'}]},
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false}, valueLabel:{font:{size:12}}},
+        scales:{y:intTicks(Math.max(0,...data))}
+      }
+    });
+  }
+}
+function renderSophosExtraCharts(w){
+  const ctx=$('#c_soph_webmal')?.getContext('2d'); if(!ctx) return; try{charts.sWebMal?.destroy()}catch{}
+  const list=(w?.sophos_web_malware||[]).filter(r=>r&&r.name).slice().sort((a,b)=>(b.count||0)-(a.count||0)).slice(0,10);
+  const labels=list.length? list.map(e=>e.name):['Không có dữ liệu']; const data=list.length? list.map(e=>+e.count||0):[0];
+  charts.sWebMal=new Chart(ctx,{
+    type:'bar',
+    data:{labels,datasets:[{data,backgroundColor:'#9370DB'}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}, valueLabel:{font:{size:12}}},
+      scales:{y:intTicks(Math.max(0,...data))}
+    }
+  });
+}
+
+// Server/Firewall (page 3)
+const weekPickerSrv=$('#weekPickerSrv');
+function fillWeekPickerSrv(){
+  const all=load(); weekPickerSrv.innerHTML='';
+  if(!all.length){ const o=document.createElement('option'); o.value='-1'; o.textContent='Chưa có dữ liệu'; weekPickerSrv.appendChild(o); return; }
+  all.forEach((w,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=[fmtLabel2(w.week_start),'–',fmtLabel2(w.week_end),w.customer||null].filter(Boolean).join(' '); weekPickerSrv.appendChild(o); });
+  let idx = parseInt(localStorage.getItem(SEL_SRV)||'',10);
+  if(Number.isNaN(idx) || idx<0 || idx>=all.length){
+    const lastKey=localStorage.getItem(LAST); idx=all.length-1;
+    if(lastKey){ const i=all.findIndex(x=>(x.week_start+'__'+x.week_end)===lastKey); if(i>=0) idx=i; }
+  }
+  weekPickerSrv.value=String(idx);
+  localStorage.setItem(SEL_SRV, String(idx));
+}
+function statusPillHtml(st){
+  const map={ 'BÌNH THƯỜNG':'status-ok', 'CẢNH BÁO':'status-warn', 'LỖI':'status-bad' };
+  const cls=map[(st||'').toUpperCase()]||'status-ok';
+  return `<span class="status-pill ${cls}">${escapeHTML(st||'BÌNH THƯỜNG')}</span>`;
+}
+function pctOrDash(v){ if(v===undefined||v===null||v==='') return 'N/A'; const n=Number(v); return Number.isFinite(n)? (n+'%') : String(v); }
+function boldBeforeColon(s){
+  const idx = String(s).indexOf(':');
+  if(idx>0){ const a=escapeHTML(s.slice(0,idx)); const b=escapeHTML(s.slice(idx+1).trim()); return `<b>${a}</b>: ${b}`; }
+  return escapeHTML(String(s||'')); 
+}
+function renderServerInfo(){
+  const all=load(); if(!all.length) return;
+  const idx=Number(weekPickerSrv.value ?? all.length-1); const w=all[idx]||{};
+
+  const ov=w.overview||{};
+  const serversCount = (w.servers_cpu||[]).length;
+  const timePerSrv = Number(ov.time_per_server_hours||0);
+  const srvDown = Number(ov.servers_down||0);
+  const downPerSrv = Number(ov.downtime_per_down_server_hours||0);
+  const total = serversCount * timePerSrv;
+  const uptime = total>0 ? Math.max(0, Math.min(100, ((total - (srvDown*downPerSrv)) / total * 100))) : 0;
+
+  $('#st_srv').textContent=fmtIntVi(serversCount);
+  $('#st_fw').textContent=fmtIntVi((w.firewalls_info||[]).length);
+  $('#st_avg').textContent=uptime.toFixed(0)+'%';
+
+  const cpuBody=$('#tbl_srv_cpu'); if(cpuBody){
+    cpuBody.innerHTML='';
+    const list=w.servers_cpu||[];
+    if(!list.length){ setEmptyRow(cpuBody); }
+    else list.forEach(s=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${escapeHTML(s.name||'-')}</td>
+        <td>${pctOrDash(s.cpu_min)}</td>
+        <td>${pctOrDash(s.cpu_max)}</td>
+        <td>${pctOrDash(s.cpu_avg)}</td>
+        <td>${statusPillHtml(s.status||'BÌNH THƯỜNG')}</td>
+        <td>${escapeHTML(s.alert||'')}</td>`;
+      cpuBody.appendChild(tr);
+    });
+  }
+  const ramBody=$('#tbl_srv_ram'); if(ramBody){
+    ramBody.innerHTML='';
+    const list=w.servers_ram||[];
+    if(!list.length){ setEmptyRow(ramBody); }
+    else list.forEach(s=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${escapeHTML(s.name||'-')}</td>
+        <td>${pctOrDash(s.ram_min)}</td>
+        <td>${pctOrDash(s.ram_max)}</td>
+        <td>${pctOrDash(s.ram_avg)}</td>
+        <td>${statusPillHtml(s.status||'BÌNH THƯỜNG')}</td>
+        <td>${escapeHTML(s.alert||'')}</td>`;
+      ramBody.appendChild(tr);
+    });
+  }
+  const diskBody=$('#tbl_srv_disk'); if(diskBody){
+    diskBody.innerHTML='';
+    const list=w.servers_disks||[];
+    if(!list.length){ setEmptyRow(diskBody); }
+    else list.forEach(s=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${escapeHTML(s.name||'-')}</td>
+        <td>${pctOrDash(s.disk_c)}</td>
+        <td>${pctOrDash(s.disk_d)}</td>
+        <td>${pctOrDash(s.disk_e)}</td>
+        <td>${pctOrDash(s.disk_f)}</td>
+        <td>${statusPillHtml(s.status||'BÌNH THƯỜNG')}</td>
+        <td>${escapeHTML(s.alert||'')}</td>`;
+      diskBody.appendChild(tr);
+    });
+  }
+
+  const issueUl=$('#fw_issue_ul');
+  if(issueUl){
+    issueUl.innerHTML='';
+    const issues=w.firewall_issues||[];
+    if(!issues.length){ const li=document.createElement('li'); li.className='muted'; li.textContent='Không có dữ liệu'; issueUl.appendChild(li); }
+    else issues.forEach(t=>{ const li=document.createElement('li'); li.innerHTML=boldBeforeColon(t); issueUl.appendChild(li); });
+  }
+  const fwBody=$('#tbl_fw_info'); if(fwBody){
+    fwBody.innerHTML='';
+    const fws=(w.firewalls_info||[]);
+    if(!fws.length){ setEmptyRow(fwBody); }
+    else{
+      fws.forEach(f=>{
+        const tr=document.createElement('tr');
+        tr.innerHTML=`<td>${escapeHTML(f.name||'-')}</td>
+          <td>${pctOrDash(f.cpu_max)}</td>
+          <td>${pctOrDash(f.mem_max)}</td>
+          <td>${statusPillHtml(f.status||'BÌNH THƯỜNG')}</td>
+          <td>${escapeHTML(f.note||'')}</td>`;
+        fwBody.appendChild(tr);
+      });
+    }
+  }
+
+  $('#exportSrvMeta').textContent = [w.customer||'', w.prepared_by||'', fmtRange(w.week_start,w.week_end)||''].filter(Boolean).join(' • ');
+}
+weekPickerSrv.onchange=()=>{ localStorage.setItem(SEL_SRV, String(weekPickerSrv.value)); renderServerInfo(); };
+
+$('#btnEditWeekSrv').onclick=()=>{ const all=load(); const idx=Number(weekPickerSrv.value ?? all.length-1); document.querySelector('.tab[data-tab="page-input"]').click(); fillForm(all[idx]||{}); };
+$('#btnDuplicateWeekSrv').onclick=()=>{ const all=load(); const idx=Number(weekPickerSrv.value ?? all.length-1); duplicateWeekFromIndex(idx); };
+$('#btnDeleteWeekSrv').onclick=()=>{ const all=load(); const idx=Number(weekPickerSrv.value ?? all.length-1); if(idx<0||!all.length) return; if(!confirm('Xóa tuần đã chọn?')) return; all.splice(idx,1); save(all); fillWeekPickerSrv(); renderServerInfo(); fillWeekPicker(); renderCharts(); };
+
+// PDF Export
+function getChartsFileName(){ const all=load(); const idx=Number(weekPicker.value ?? all.length-1); const w=all[idx]||{}; const label=[w.week_start||'',w.week_end||'',w.customer||''].filter(Boolean).join('_'); return sanitizeFile('SOC_Charts_'+(label||'week')+'.pdf'); }
+function getSrvFileName(){ const all=load(); const idx=Number(weekPickerSrv.value ?? all.length-1); const w=all[idx]||{}; const label=[w.week_start||'',w.week_end||'',w.customer||''].filter(Boolean).join('_'); return sanitizeFile('SOC_ServerFirewall_'+(label||'week')+'.pdf'); }
+
+async function exportSectionToPDF(sectionEl, fileName){
+  if(!sectionEl) return;
+  await new Promise(r=>setTimeout(r, 150));
+  const canvas = await html2canvas(sectionEl, { backgroundColor:'#ffffff', scale:2, useCORS:true, logging:false,
+    windowWidth: Math.max(document.documentElement.clientWidth, sectionEl.scrollWidth),
+    windowHeight: Math.max(document.documentElement.clientHeight, sectionEl.scrollHeight)
+  });
+  const imgData = canvas.toDataURL('image/png');
+  const pxW = canvas.width, pxH = canvas.height;
+  const MAX = 14400;
+  const ratio = Math.min(1, MAX/pxW, MAX/pxH);
+  const pdfW = Math.floor(pxW * ratio);
+  const pdfH = Math.floor(pxH * ratio);
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({orientation:'p', unit:'px', format:[pdfW, pdfH], compress:true});
+  pdf.addImage(imgData, 'PNG', 0, 0, pdfW, pdfH, undefined, 'FAST');
+  pdf.save(fileName);
+}
+async function exportChartsPage(){
+  const all=load(); if(!all.length){ alert('Chưa có dữ liệu'); return; }
+  const idx=Number(weekPicker.value ?? all.length-1); const w=all[idx]||{};
+  $('#exportChartsMeta').textContent = [w.customer||'', w.prepared_by||'', fmtRange(w.week_start,w.week_end)||''].filter(Boolean).join(' • ');
+  document.body.classList.add('exporting');
+  try{ await exportSectionToPDF($('#page-charts'), getChartsFileName()); }finally{ document.body.classList.remove('exporting'); }
+}
+async function exportSrvPage(){
+  const all=load(); if(!all.length){ alert('Chưa có dữ liệu'); return; }
+  const idx=Number(weekPickerSrv.value ?? all.length-1); const w=all[idx]||{};
+  $('#exportSrvMeta').textContent = [w.customer||'', w.prepared_by||'', fmtRange(w.week_start,w.week_end)||''].filter(Boolean).join(' • ');
+  document.body.classList.add('exporting');
+  try{ await exportSectionToPDF($('#page-servers'), getSrvFileName()); }finally{ document.body.classList.remove('exporting'); }
+}
+$('#btnExportChartsPDF')?.addEventListener('click', exportChartsPage);
+$('#btnExportSrvPDF')?.addEventListener('click', exportSrvPage);
+
+
+// ========== EXCEL IMPORT (SheetJS) ==========
+// Quy ước: Events/users cộng dồn; Daily (Zabbix/Sophos) MỖI FILE -> THÊM MỘT NGÀY MỚI (không ghi đè).
+
+function ddmmyyyyToIso(s){
+  if(!s) return '';
+  const m = String(s).match(/(\d{2})(\d{2})(\d{4})/);
+  if(!m) return '';
+  const dd=+m[1], mm=+m[2], yy=+m[3];
+  const dt = new Date(Date.UTC(yy, mm-1, dd));
+  return dt.toISOString().slice(0,10);
+}
+function toIsoFromExcelCell(v){
+  if(!v) return '';
+  if(v instanceof Date){
+    const z = new Date(v.getTime() - v.getTimezoneOffset()*60000);
+    return z.toISOString().slice(0,10);
+  }
+  const s = String(v).trim();
+  const m1 = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m1){ return `${m1[1]}-${m1[2]}-${m1[3]}`; }
+  const m2 = s.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
+  if(m2){
+    const dt = new Date(Date.UTC(+m2[3], +m2[2]-1, +m2[1]));
+    return dt.toISOString().slice(0,10);
+  }
+  return '';
+}
+function monSunRange(iso){
+  if(!iso) return {start:'',end:''};
+  const d = new Date(iso+'T00:00:00Z');
+  if(Number.isNaN(+d)) return {start:iso,end:iso};
+  let day = d.getUTCDay(); if(day===0) day=7;
+  const start = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()-(day-1)));
+  const end   = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()+6));
+  return { start: start.toISOString().slice(0,10), end: end.toISOString().slice(0,10) };
+}
+function normalize(s){ return String(s||'').trim(); }
+function detectHeaderIdx(rows, wanted){
+  for(let i=0;i<Math.min(50,rows.length);i++){
+    const row = rows[i]||[];
+    const low = row.map(x=>String(x||'').trim().toLowerCase());
+    const hasAll = Object.values(wanted).every(choices=> choices.some(lbl=> low.includes(String(lbl).toLowerCase())));
+    if(hasAll) return i;
+  }
+  return -1;
+}
+function colIndexMap(headerRow, wanted){
+  const low = headerRow.map(x=>String(x||'').trim().toLowerCase());
+  const idx={};
+  Object.entries(wanted).forEach(([k,choices])=>{
+    let found=-1;
+    choices.some(lbl=>{ const j=low.indexOf(String(lbl).toLowerCase()); if(j>=0){found=j; return true;} return false; });
+    idx[k]=found;
+  });
+  return idx;
+}
+function readRowsAfterHeader(rows, hIdx, idxMap){
+  const out=[];
+  for(let r=hIdx+1;r<rows.length;r++){
+    const rw = rows[r]||[];
+    const no = Number(rw[idxMap.no]);
+    const device = normalize(rw[idxMap.device]);
+    const problem = normalize(rw[idxMap.problem]);
+    if(!no && !device && !problem) continue;
+    if(!Number.isFinite(no) && !device && !problem) break;
+    out.push({no, device, problem});
+  }
+  return out;
+}
+function parseZabbixSheet(ws){
+  const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:true});
+  let dateIso='';
+  for(let i=0;i<10 && i<rows.length;i++){
+    const row=rows[i]||=[];
+    for(let j=0;j<Math.min(8,row.length);j++){
+      const v = String(row[j]||'').trim().toLowerCase();
+      if(v.replace(':','')==='date'){ dateIso = toIsoFromExcelCell(row[j+1]); break; }
+    }
+    if(dateIso) break;
+  }
+  const hIdx = detectHeaderIdx(rows, {no:['No'], device:['Device','Thiết bị','Server','PC'], problem:['Problem','Event','Tên Event']});
+  if(hIdx<0) return { dateIso, zDaily:0, zEvMap:{}, zLoginMap:{} };
+  const idx = colIndexMap(rows[hIdx], {no:['No'], device:['Device','Thiết bị','Server','PC'], problem:['Problem','Event','Tên Event']});
+  const list = readRowsAfterHeader(rows, hIdx, idx);
+  let zDaily=0; const zEvMap={}, zLoginMap={};
+  list.forEach(r=>{
+    if(Number.isFinite(r.no)) zDaily = Math.max(zDaily, r.no||0);
+    if(r.problem) zEvMap[r.problem] = (zEvMap[r.problem]||0) + 1;
+    const p = (r.problem||'').toLowerCase();
+    if(/log[io]n/.test(p) && /fail/.test(p)){
+      const dev = r.device || '(unknown)';
+      zLoginMap[dev] = (zLoginMap[dev]||0) + 1;
+    }
+  });
+  return { dateIso, zDaily, zEvMap, zLoginMap };
+}
+function parseSophosSheet(ws){
+  const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:true});
+  const hIdx = detectHeaderIdx(rows, {no:['No'], device:['Device'], problem:['Problem']});
+  if(hIdx<0) return { sDaily:0, sEvMap:{}, sUserMap:{}, sWebMalMap:{} };
+  const idx = colIndexMap(rows[hIdx], {no:['No'], device:['Device'], problem:['Problem']});
+  const list = readRowsAfterHeader(rows, hIdx, idx);
+  let sDaily=0; const sEvMap={}, sUserMap={}, sWebMalMap={};
+  list.forEach(r=>{
+    if(Number.isFinite(r.no)) sDaily = Math.max(sDaily, r.no||0);
+    if(r.problem) sEvMap[r.problem] = (sEvMap[r.problem]||0) + 1;
+    const dev = r.device||'(unknown)';
+    if(dev) sUserMap[dev] = (sUserMap[dev]||0) + 1;
+    const p = (r.problem||'').toUpperCase();
+    if(p.includes('WEB') && p.includes('MALWARE')){ sWebMalMap[dev] = (sWebMalMap[dev]||0) + 1; }
+  });
+  return { sDaily, sEvMap, sUserMap, sWebMalMap };
+}
+
+// Helpers for events/users merge
+const arrToMap = (arr, k='name', v='count') => { const m={}; (arr||[]).forEach(o=>{ if(o && o[k]) m[o[k]]=(m[o[k]]||0)+(Number(o[v])||0); }); return m; };
+const mapToArr = (m, k='name', v='count') => Object.entries(m).map(([kk,vv])=>({[k]:kk,[v]:Number(vv)||0})).sort((a,b)=>(b[v]||0)-(a[v]||0));
+
+// Parse một file
+async function parseOneXlsxFile(file){
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, {type:'array', cellDates:true});
+
+  const dateFromName = ddmmyyyyToIso(file.name);
+  let zabbix=null, sophos=null, dateFromSheet='';
+
+  (wb.SheetNames||[]).forEach(n=>{
+    const low=String(n||'').toLowerCase();
+    if(!zabbix && low.includes('zabbix')) zabbix = parseZabbixSheet(wb.Sheets[n]);
+    if(!sophos && low.includes('sophos')) sophos = parseSophosSheet(wb.Sheets[n]);
+  });
+  if(zabbix && zabbix.dateIso) dateFromSheet = zabbix.dateIso;
+
+  const isoDate = dateFromName || dateFromSheet;
+  if(!isoDate) throw new Error('Không xác định được ngày (từ tên file hoặc trong sheet).');
+
+  const rng = monSunRange(isoDate);
+  return {
+    fileName: file.name,
+    isoDate,
+    weekKey: rng.start+'__'+rng.end,
+    weekStart: rng.start,
+    weekEnd: rng.end,
+    zDaily: zabbix? (Number(zabbix.zDaily)||0) : 0,
+    sDaily: sophos? (Number(sophos.sDaily)||0) : 0,
+    zEvMap: zabbix? zabbix.zEvMap : {},
+    zLoginMap: zabbix? zabbix.zLoginMap : {},
+    sEvMap: sophos? sophos.sEvMap : {},
+    sWebMalMap: sophos? sophos.sWebMalMap : {},
+    sUserMap: sophos? sophos.sUserMap : {}
+  };
+}
+
+function getBaseForWeek(weekStart, weekEnd){
+  const key = weekStart+'__'+weekEnd;
+  let base = (typeof collectForm==='function') ? collectForm() : null;
+  if(base && base.week_start===weekStart && base.week_end===weekEnd) return base;
+
+  const all = load();
+  const id = all.findIndex(x=>(x.week_start+'__'+x.week_end)===key);
+  if(id>=0) return JSON.parse(JSON.stringify(all[id]));
+
+  return {
+    week_start:weekStart, week_end:weekEnd, customer:'', prepared_by:'',
+    daily_zabbix:[], daily_sophos:[],
+    zabbix_events:[], sophos_events:[],
+    zabbix_login_fails:[], sophos_web_malware:[],
+    sophos_users:[],
+    overview:{ time_per_server_hours:168, servers_down:0, downtime_per_down_server_hours:0 },
+    servers_cpu:[], servers_ram:[], servers_disks:[],
+    firewall_issues:[], firewalls_info:[], servers:[]
+  };
+}
+
+// Import nhiều file: append daily, merge events/users
+async function handleXlsxFiles(files){
+  if(!files?.length) return;
+
+  const weekMap = new Map(); // key -> { base, zEv, sEv, zLog, sWeb, sUser, dZ:list, dS:list }
+  const results = [];
+
+  for(const f of files){
+    try{
+      const p = await parseOneXlsxFile(f);
+      results.push({file:f.name, date:p.isoDate, z:p.zDaily, s:p.sDaily, key:p.weekKey});
+
+      let wk = weekMap.get(p.weekKey);
+      if(!wk){
+        const base = getBaseForWeek(p.weekStart, p.weekEnd);
+        wk = {
+          base,
+          zEv: arrToMap(base.zabbix_events,'name','count'),
+          sEv: arrToMap(base.sophos_events,'name','count'),
+          zLog: arrToMap(base.zabbix_login_fails,'name','count'),
+          sWeb: arrToMap(base.sophos_web_malware,'name','count'),
+          sUser: arrToMap(base.sophos_users,'user','detections'),
+          dZ: (base.daily_zabbix||[]).slice(), // GIỮ MẢNG, append từng file
+          dS: (base.daily_sophos||[]).slice()
+        };
+        weekMap.set(p.weekKey, wk);
+      }
+
+      // Append daily: mỗi file -> 1 record ngày đúng isoDate
+      wk.dZ.push({date:p.isoDate, count:Number(p.zDaily||0)});
+      wk.dS.push({date:p.isoDate, count:Number(p.sDaily||0)});
+
+      // Merge các phần khác (cộng dồn)
+      Object.entries(p.zEvMap||{}).forEach(([k,v])=>wk.zEv[k]=(wk.zEv[k]||0)+(Number(v)||0));
+      Object.entries(p.zLoginMap||{}).forEach(([k,v])=>wk.zLog[k]=(wk.zLog[k]||0)+(Number(v)||0));
+      Object.entries(p.sEvMap||{}).forEach(([k,v])=>wk.sEv[k]=(wk.sEv[k]||0)+(Number(v)||0));
+      Object.entries(p.sWebMalMap||{}).forEach(([k,v])=>wk.sWeb[k]=(wk.sWeb[k]||0)+(Number(v)||0));
+      Object.entries(p.sUserMap||{}).forEach(([k,v])=>wk.sUser[k]=(wk.sUser[k]||0)+(Number(v)||0));
+    }catch(err){
+      console.warn('Parse file lỗi:', f?.name, err);
+      alert(`Không import được file: ${f?.name}\nLý do: ${err && err.message ? err.message : String(err)}`);
+    }
+  }
+
+  // Hoàn thiện base
+  weekMap.forEach((wk)=>{
+    wk.base.daily_zabbix = wk.dZ.slice().sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+    wk.base.daily_sophos = wk.dS.slice().sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+    wk.base.zabbix_events = mapToArr(wk.zEv,'name','count');
+    wk.base.sophos_events = mapToArr(wk.sEv,'name','count');
+    wk.base.zabbix_login_fails = mapToArr(wk.zLog,'name','count');
+    wk.base.sophos_web_malware = mapToArr(wk.sWeb,'name','count');
+    wk.base.sophos_users = mapToArr(wk.sUser,'user','detections').map(x=>({user:x.user, entity:'', detections:x.detections}));
+  });
+
+  // Đổ form
+  let fillKey = null;
+  if(weekMap.size===1){
+    fillKey = Array.from(weekMap.keys())[0];
+  }else if(weekMap.size>1){
+    const cur = collectForm();
+    const curKey = cur?.week_start && cur?.week_end ? (cur.week_start+'__'+cur.week_end) : '';
+    if(curKey && weekMap.has(curKey)) fillKey = curKey;
+    else{
+      fillKey = Array.from(weekMap.entries()).sort((a,b)=> (a[1].base.week_start||'').localeCompare(b[1].base.week_start||'')).pop()[0];
+    }
+  }
+  if(fillKey){
+    document.querySelector('.tab[data-tab="page-input"]').click();
+    fillForm(weekMap.get(fillKey).base);
+  }
+
+  // Tự động lưu nếu bật
+  const autoSave = document.getElementById('autoSaveOnImport');
+  if(autoSave && autoSave.checked){
+    const all = load();
+    const indexByKey = new Map(all.map((w,i)=>[(w.week_start+'__'+w.week_end), i]));
+    weekMap.forEach((wk, key)=>{
+      const idx = indexByKey.get(key);
+      if(idx==null || idx<0){ all.push(wk.base); indexByKey.set(key, all.length-1); }
+      else{ all[idx]=wk.base; }
+    });
+    save(all);
+    fillWeekPicker(); renderCharts(); fillWeekPickerSrv(); renderServerInfo();
+  }
+
+  if(results.length){
+    const lines = results.map(r=>`• ${r.file} → ${r.date} (Z:${r.z}, S:${r.s})`).join('\n');
+    const weeks = Array.from(new Set(results.map(r=>r.key))).join(', ');
+    const saved = (document.getElementById('autoSaveOnImport')?.checked ? 'ĐÃ lưu tuần vào bộ nhớ.' : 'Chưa lưu vào bộ nhớ.');
+    alert(`Đã import ${results.length} file Excel.
+Tuần ảnh hưởng: ${weeks}
+Chi tiết:
+${lines}
+
+${saved}`);
+  }
+}
+
+// Handler 1 file (tương thích cũ) — cũng append daily, merge phần khác
+async function handleXlsxFile(file){
+  const p = await parseOneXlsxFile(file);
+  const key = p.weekKey;
+
+  let base = getBaseForWeek(p.weekStart, p.weekEnd);
+
+  // Append daily
+  base.daily_zabbix = (base.daily_zabbix||[]).concat([{date:p.isoDate, count:Number(p.zDaily||0)}]).sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+  base.daily_sophos = (base.daily_sophos||[]).concat([{date:p.isoDate, count:Number(p.sDaily||0)}]).sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+
+  // Merge phần khác
+  const zEv   = arrToMap(base.zabbix_events,'name','count');
+  const sEv   = arrToMap(base.sophos_events,'name','count');
+  const zLog  = arrToMap(base.zabbix_login_fails,'name','count');
+  const sWeb  = arrToMap(base.sophos_web_malware,'name','count');
+  const sUser = arrToMap(base.sophos_users,'user','detections');
+
+  Object.entries(p.zEvMap||{}).forEach(([k,v])=>zEv[k]=(zEv[k]||0)+(Number(v)||0));
+  Object.entries(p.zLoginMap||{}).forEach(([k,v])=>zLog[k]=(zLog[k]||0)+(Number(v)||0));
+  Object.entries(p.sEvMap||{}).forEach(([k,v])=>sEv[k]=(sEv[k]||0)+(Number(v)||0));
+  Object.entries(p.sWebMalMap||{}).forEach(([k,v])=>sWeb[k]=(sWeb[k]||0)+(Number(v)||0));
+  Object.entries(p.sUserMap||{}).forEach(([k,v])=>sUser[k]=(sUser[k]||0)+(Number(v)||0));
+
+  base.zabbix_events = mapToArr(zEv,'name','count');
+  base.sophos_events = mapToArr(sEv,'name','count');
+  base.zabbix_login_fails = mapToArr(zLog,'name','count');
+  base.sophos_web_malware = mapToArr(sWeb,'name','count');
+  base.sophos_users = mapToArr(sUser,'user','detections').map(x=>({user:x.user, entity:'', detections:x.detections}));
+
+  document.querySelector('.tab[data-tab="page-input"]').click();
+  fillForm(base);
+
+  const autoSave = document.getElementById('autoSaveOnImport');
+  if(autoSave && autoSave.checked){
+    const all = load();
+    const id = all.findIndex(x=>(x.week_start+'__'+x.week_end)===key);
+    if(id<0) all.push(base); else all[id]=base;
+    save(all); localStorage.setItem(LAST, key);
+    fillWeekPicker(); renderCharts(); fillWeekPickerSrv(); renderServerInfo();
+  }
+
+  alert(`Đã import Excel: ${file.name}
+Ngày: ${p.isoDate}
+Zabbix: ${p.zDaily} events
+Sophos: ${p.sDaily} events
+
+Đã đổ dữ liệu vào biểu mẫu. ${ (document.getElementById('autoSaveOnImport')?.checked ? 'Đồng thời đã lưu tuần vào bộ nhớ.' : 'Chưa lưu vào bộ nhớ.') }`);
+}
+
+// Gắn UI: import nhiều file
+(function(){
+  const btn = document.getElementById('btnImportXLSX');
+  const inp = document.getElementById('fileXLSX');
+  if(btn && inp){
+    btn.addEventListener('click', ()=> inp.click());
+    inp.addEventListener('change', e=>{
+      const files = Array.from(e.target.files||[]);
+      if(!files.length) return;
+      handleXlsxFiles(files).catch(err=>{
+        console.error(err);
+        alert('Import Excel thất bại: ' + (err && err.message ? err.message : String(err)));
+      }).finally(()=>{ e.target.value=''; });
+    });
+  } else {
+    console.warn('Nút hoặc input Import Excel chưa render.');
+  }
+})();
+// ========== /EXCEL IMPORT ==========
+
+document.addEventListener('DOMContentLoaded', async ()=>{
+  await trySyncFromServer();
+  fillWeekPicker(); fillWeekPickerSrv();
+  renderCharts(); renderServerInfo();
+});
+</script>
+</body>
+</html>
